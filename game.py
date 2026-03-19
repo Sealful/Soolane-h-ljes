@@ -1,4 +1,3 @@
-# Example file showing a circle moving on screen
 import pygame
 
 # pygame setup
@@ -9,35 +8,75 @@ running = True
 dt = 0
 
 player_pos = pygame.Vector2(screen.get_width() / 2, screen.get_height() / 2)
+player_radius = 40
+player_speed = 300
+
+projectiles = []
+projectile_speed = 700
+projectile_radius = 8
+
+shoot_cooldown = 0.12
+shoot_timer = 0
 
 while running:
     # poll for events
-    # pygame.QUIT event means the user clicked X to close your window
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
 
-    # fill the screen with a color to wipe away anything from last frame
-    screen.fill("purple")
-
-    pygame.draw.circle(screen, "red", player_pos, 40)
-
     keys = pygame.key.get_pressed()
     if keys[pygame.K_w]:
-        player_pos.y -= 300 * dt
+        player_pos.y -= player_speed * dt
     if keys[pygame.K_s]:
-        player_pos.y += 300 * dt
+        player_pos.y += player_speed * dt
     if keys[pygame.K_a]:
-        player_pos.x -= 300 * dt
+        player_pos.x -= player_speed * dt
     if keys[pygame.K_d]:
-        player_pos.x += 300 * dt
+        player_pos.x += player_speed * dt
+
+    # left clickiga laskmine
+    shoot_timer -= dt
+    mouse_buttons = pygame.mouse.get_pressed()
+
+    if mouse_buttons[0] and shoot_timer <= 0:  # left clicki hoidmine
+        mouse_pos = pygame.Vector2(pygame.mouse.get_pos())
+        direction = mouse_pos - player_pos
+
+        if direction.length() != 0:
+            direction = direction.normalize()
+
+            # kuuli laskmine selle tegelase äärest
+            spawn_pos = player_pos + direction * (player_radius + projectile_radius)
+
+            projectile = {
+                "pos": pygame.Vector2(spawn_pos),
+                "vel": direction * projectile_speed
+            }
+            projectiles.append(projectile)
+            shoot_timer = shoot_cooldown
+
+    # uuendab neid kuule
+    for projectile in projectiles:
+        projectile["pos"] += projectile["vel"] * dt
+
+    # kustutab kuulid mis ekraanist välja lähgevad
+    projectiles = [
+        p for p in projectiles
+        if 0 <= p["pos"].x <= screen.get_width()
+        and 0 <= p["pos"].y <= screen.get_height()
+    ]
+
+    # fill the screen with a color to wipe away anything from last frame
+    screen.fill("purple")
+    pygame.draw.circle(screen, "red", player_pos, player_radius)
+
+    for projectile in projectiles:
+        pygame.draw.circle(screen, "yellow", projectile["pos"], projectile_radius)
 
     # flip() the display to put your work on screen
     pygame.display.flip()
 
     # limits FPS to 60
-    # dt is delta time in seconds since last frame, used for framerate-
-    # independent physics.
     dt = clock.tick(60) / 1000
 
 pygame.quit()
