@@ -70,14 +70,13 @@ while running:
     screen.fill("black")
 
     mouse_pos = pygame.mouse.get_pos()
-    angle = pygame.math.Vector2(mouse_pos) - player_pos
-    angle = angle.angle_to(pygame.Vector2(0, -1))
+    direction = pygame.math.Vector2(mouse_pos) - player_pos
+    angle = pygame.Vector2(0, -1).angle_to(direction)
 
     arrow_points = [
         (0, -player_radius),
-        (-player_radius * 0.6, player_radius * 0.5),
-        (0, player_radius * 0.3),
-        (player_radius * 0.6, player_radius * 0.5),
+        (-player_radius * 0.5, player_radius * 0.5),
+        (player_radius * 0.5, player_radius * 0.5),
     ]
     rotated_points = [
         pygame.Vector2(p).rotate(angle) + player_pos for p in arrow_points
