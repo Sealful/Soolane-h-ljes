@@ -1,22 +1,22 @@
 import pygame
 import math
 
+# ============================================
 # pygame setup
+# ============================================
 pygame.init()
 screen = pygame.display.set_mode((1280, 720))
 clock = pygame.time.Clock()
 running = True
 dt = 0
 
+# ============================================
+# Map configuration
+# ============================================
 WORLD_SIZE = 3000
 MAP_INSET = 300
 
-map_points = [
-    (MAP_INSET, MAP_INSET),
-    (WORLD_SIZE - MAP_INSET, MAP_INSET),
-    (WORLD_SIZE, MAP_INSET + (WORLD_SIZE - 2 * MAP_INSET) * 0),
-]
-
+# Generate octagonal map vertices
 center = WORLD_SIZE / 2
 apothem = (WORLD_SIZE - 2 * MAP_INSET) / 2
 
@@ -27,8 +27,14 @@ for i in range(8):
     y = center + apothem * math.sin(angle)
     map_vertices.append((x, y))
 
+# ============================================
+# Camera
+# ============================================
 camera_offset = pygame.Vector2(0, 0)
 
+# ============================================
+# Player settings
+# ============================================
 player_pos = pygame.Vector2(center, center)
 player_radius = 15
 player_speed = 300
@@ -36,6 +42,9 @@ player_angle = 0
 target_angle = 0
 rotation_speed = 8
 
+# ============================================
+# Projectiles (kuulid)
+# ============================================
 projectiles = []
 projectile_speed = 700
 projectile_radius = 8
@@ -43,7 +52,20 @@ projectile_radius = 8
 shoot_cooldown = 0.12
 shoot_timer = 0
 
+# ============================================
+# Player trail (visual effect)
+# ============================================
+TRAIL_LIFETIME = 0.5  # how long trail points last in seconds
+TRAIL_INTERVAL = 0.02  # how often to record a trail point
+trail_timer = 0
+trail = []  # list of (position, age) tuples
+
+# ============================================
+# Utility functions
+# ============================================
+
 def point_in_polygon(point, vertices):
+    """Check if a point is inside a polygon using ray casting algorithm."""
     x, y = point
     inside = False
     n = len(vertices)
@@ -57,9 +79,11 @@ def point_in_polygon(point, vertices):
     return inside
 
 def clamp_to_map(pos, vertices, radius):
+    """Clamp player position to stay inside the map boundary."""
     if point_in_polygon((pos.x, pos.y), vertices):
         return pos
 
+    # Find the closest point on any map edge
     min_dist = float('inf')
     closest = pos
     for i in range(len(vertices)):
@@ -81,16 +105,22 @@ def clamp_to_map(pos, vertices, radius):
             min_dist = dist
             closest = pygame.Vector2(proj_x, proj_y)
 
+    # Push player back inside by their radius
     if min_dist > 0:
         dir_vec = pygame.Vector2(closest.x - pos.x, closest.y - pos.y).normalize()
         return closest - dir_vec * radius
     return pos
 
+# ============================================
+# Main game loop
+# ============================================
 while running:
+    # poll for events
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
 
+    # WASD movement
     keys = pygame.key.get_pressed()
     move_dir = pygame.Vector2(0, 0)
     if keys[pygame.K_w]:
@@ -106,8 +136,10 @@ while running:
         move_dir.x += 1
         player_pos.x += player_speed * dt
 
+    # Keep player inside the map
     player_pos = clamp_to_map(player_pos, map_vertices, player_radius)
 
+    # Smooth rotation toward movement direction
     if move_dir.length() > 0:
         move_dir = move_dir.normalize()
         target_angle = pygame.Vector2(0, -1).angle_to(move_dir)
@@ -121,16 +153,18 @@ while running:
     if abs(angle_diff) > 0.5:
         player_angle += math.copysign(min(abs(angle_diff), rotation_speed * dt * 60), angle_diff)
 
+    # Left click shooting (left clickiga laskmine)
     shoot_timer -= dt
     mouse_buttons = pygame.mouse.get_pressed()
 
-    if mouse_buttons[0] and shoot_timer <= 0:
+    if mouse_buttons[0] and shoot_timer <= 0:  # left clicki hoidmine
         world_mouse = pygame.Vector2(pygame.mouse.get_pos()) + camera_offset
         direction = world_mouse - player_pos
 
         if direction.length() != 0:
             direction = direction.normalize()
 
+            # Shoot from the edge of the player (kuuli laskmine selle tegelase äärest)
             spawn_pos = player_pos + direction * (player_radius + projectile_radius)
 
             projectile = {
@@ -140,21 +174,48 @@ while running:
             projectiles.append(projectile)
             shoot_timer = shoot_cooldown
 
+    # Update projectiles (uuendab neid kuule)
     for projectile in projectiles:
         projectile["pos"] += projectile["vel"] * dt
 
+    # Remove projectiles that leave the map (kustutab kuulid mis kaardilt välja lähevad)
     projectiles = [
         p for p in projectiles
         if point_in_polygon((p["pos"].x, p["pos"].y), map_vertices)
     ]
 
+    # Update player trail
+    trail_timer += dt
+    if trail_timer >= TRAIL_INTERVAL:
+        trail.append((pygame.Vector2(player_pos), 0))
+        trail_timer = 0
+
+    # Age trail points and remove expired ones
+    trail = [(pos, age + dt) for pos, age in trail if age < TRAIL_LIFETIME]
+
+    # Camera follows the player
     camera_offset.x = player_pos.x - screen.get_width() / 2
     camera_offset.y = player_pos.y - screen.get_height() / 2
 
+    # ============================================
+    # Rendering
+    # ============================================
+
+    # fill the screen with black to wipe away anything from last frame
     screen.fill("black")
 
+    # Draw map border
     pygame.draw.polygon(screen, "white", [(v[0] - camera_offset.x, v[1] - camera_offset.y) for v in map_vertices], 3)
 
+    # Draw player trail (visual effect)
+    for i, (pos, age) in enumerate(trail):
+        screen_pos = (pos.x - camera_offset.x, pos.y - camera_offset.y)
+        alpha = int(255 * (1 - age / TRAIL_LIFETIME))
+        trail_surface = pygame.Surface((player_radius * 0.6, player_radius * 0.6), pygame.SRCALPHA)
+        trail_surface.fill((255, 255, 255, alpha // 2))
+        screen.blit(trail_surface, (screen_pos[0] - player_radius * 0.3, screen_pos[1] - player_radius * 0.3))
+
+    # Draw player arrow (tegeline)
     arrow_points = [
         (0, -player_radius),
         (-player_radius * 0.5, player_radius * 0.3),
@@ -172,14 +233,17 @@ while running:
     screen_y = player_pos.y - camera_offset.y - rotated_arrow.get_height() / 2
     screen.blit(rotated_arrow, (screen_x, screen_y))
 
+    # Draw projectiles (kuulid)
     for projectile in projectiles:
         end_pos = projectile["pos"] + projectile["vel"].normalize() * 15
         start_screen = (projectile["pos"].x - camera_offset.x, projectile["pos"].y - camera_offset.y)
         end_screen = (end_pos.x - camera_offset.x, end_pos.y - camera_offset.y)
         pygame.draw.line(screen, "yellow", start_screen, end_screen, 3)
 
+    # flip() the display to put your work on screen
     pygame.display.flip()
 
+    # limits FPS to 60
     dt = clock.tick(60) / 1000
 
 pygame.quit()
