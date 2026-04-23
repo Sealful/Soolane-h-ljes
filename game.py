@@ -10,6 +10,7 @@ dt = 0
 player_pos = pygame.Vector2(screen.get_width() / 2, screen.get_height() / 2)
 player_radius = 40
 player_speed = 300
+player_angle = 0
 
 projectiles = []
 projectile_speed = 700
@@ -25,14 +26,23 @@ while running:
             running = False
 
     keys = pygame.key.get_pressed()
+    move_dir = pygame.Vector2(0, 0)
     if keys[pygame.K_w]:
+        move_dir.y -= 1
         player_pos.y -= player_speed * dt
     if keys[pygame.K_s]:
+        move_dir.y += 1
         player_pos.y += player_speed * dt
     if keys[pygame.K_a]:
+        move_dir.x -= 1
         player_pos.x -= player_speed * dt
     if keys[pygame.K_d]:
+        move_dir.x += 1
         player_pos.x += player_speed * dt
+
+    if move_dir.length() > 0:
+        move_dir = move_dir.normalize()
+        player_angle = pygame.Vector2(0, -1).angle_to(move_dir)
 
     # left clickiga laskmine
     shoot_timer -= dt
@@ -69,19 +79,23 @@ while running:
     # fill the screen with a color to wipe away anything from last frame
     screen.fill("black")
 
-    mouse_pos = pygame.mouse.get_pos()
-    direction = pygame.math.Vector2(mouse_pos) - player_pos
-    angle = pygame.Vector2(0, -1).angle_to(direction)
-
     arrow_points = [
         (0, -player_radius),
-        (-player_radius * 0.5, player_radius * 0.5),
-        (player_radius * 0.5, player_radius * 0.5),
+        (-player_radius * 0.5, player_radius * 0.3),
+        (0, player_radius * 0.5),
+        (player_radius * 0.5, player_radius * 0.3),
     ]
     rotated_points = [
-        pygame.Vector2(p).rotate(angle) + player_pos for p in arrow_points
+        pygame.Vector2(p).rotate(player_angle) + player_pos for p in arrow_points
     ]
-    pygame.draw.polygon(screen, "red", rotated_points)
+
+    arrow_surface = pygame.Surface((player_radius * 2, player_radius * 2), pygame.SRCALPHA)
+    arrow_surface_points = [
+        pygame.Vector2(p) + player_radius for p in arrow_points
+    ]
+    pygame.draw.polygon(arrow_surface, (255, 255, 255, 180), arrow_surface_points)
+    rotated_arrow = pygame.transform.rotate(arrow_surface, player_angle)
+    screen.blit(rotated_arrow, (player_pos.x - rotated_arrow.get_width() / 2, player_pos.y - rotated_arrow.get_height() / 2))
 
     for projectile in projectiles:
         end_pos = projectile["pos"] + projectile["vel"].normalize() * 15
