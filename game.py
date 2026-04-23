@@ -1,4 +1,5 @@
 import pygame
+import math
 
 # pygame setup
 pygame.init()
@@ -11,6 +12,8 @@ player_pos = pygame.Vector2(screen.get_width() / 2, screen.get_height() / 2)
 player_radius = 40
 player_speed = 300
 player_angle = 0
+target_angle = 0
+rotation_speed = 8
 
 projectiles = []
 projectile_speed = 700
@@ -42,7 +45,16 @@ while running:
 
     if move_dir.length() > 0:
         move_dir = move_dir.normalize()
-        player_angle = pygame.Vector2(0, -1).angle_to(move_dir)
+        target_angle = pygame.Vector2(0, -1).angle_to(move_dir)
+
+    angle_diff = target_angle - player_angle
+    if angle_diff > 180:
+        angle_diff -= 360
+    elif angle_diff < -180:
+        angle_diff += 360
+
+    if abs(angle_diff) > 0.5:
+        player_angle += math.copysign(min(abs(angle_diff), rotation_speed * dt * 60), angle_diff)
 
     # left clickiga laskmine
     shoot_timer -= dt
