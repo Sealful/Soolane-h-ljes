@@ -211,8 +211,9 @@ while running:
     for i, (pos, age) in enumerate(trail):
         screen_pos = (pos.x - camera_offset.x, pos.y - camera_offset.y)
         alpha = int(255 * (1 - age / TRAIL_LIFETIME))
-        trail_surface = pygame.Surface((player_radius, player_radius), pygame.SRCALPHA)
-        pygame.draw.circle(trail_surface, (255, 255, 255, alpha // 2), (player_radius // 2, player_radius // 2), player_radius // 2)
+        trail_surface = pygame.Surface((player_radius, player_radius))
+        trail_surface.set_alpha(alpha // 2)
+        trail_surface.fill((255, 255, 255))
         screen.blit(trail_surface, (screen_pos[0] - player_radius // 2, screen_pos[1] - player_radius // 2))
 
     # Draw player arrow (tegeline)
