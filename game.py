@@ -105,10 +105,11 @@ def clamp_to_map(pos, vertices, radius):
             min_dist = dist
             closest = pygame.Vector2(proj_x, proj_y)
 
-    # Push player back inside by their radius
+    # Push player inside: dir_vec points from player to edge (inward)
+    # so we add it to closest to move further inside
     if min_dist > 0:
         dir_vec = pygame.Vector2(closest.x - pos.x, closest.y - pos.y).normalize()
-        return closest - dir_vec * radius
+        return closest + dir_vec * radius
     return pos
 
 # ============================================
