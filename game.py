@@ -184,9 +184,9 @@ while running:
         if point_in_polygon((p["pos"].x, p["pos"].y), map_vertices)
     ]
 
-    # Update player trail
+    # Update player trail (only record when moving)
     trail_timer += dt
-    if trail_timer >= TRAIL_INTERVAL:
+    if trail_timer >= TRAIL_INTERVAL and move_dir.length() > 0:
         trail.append((pygame.Vector2(player_pos), 0))
         trail_timer = 0
 
@@ -207,14 +207,16 @@ while running:
     # Draw map border
     pygame.draw.polygon(screen, "white", [(v[0] - camera_offset.x, v[1] - camera_offset.y) for v in map_vertices], 3)
 
-    # Draw player trail (visual effect)
-    for i, (pos, age) in enumerate(trail):
+    # Draw player trail (visual effect - small fading circles)
+    trail_radius = int(player_radius * 0.35)
+    for pos, age in trail:
         screen_pos = (pos.x - camera_offset.x, pos.y - camera_offset.y)
-        alpha = int(255 * (1 - age / TRAIL_LIFETIME))
-        trail_surface = pygame.Surface((player_radius, player_radius))
-        trail_surface.set_alpha(alpha // 2)
-        trail_surface.fill((255, 255, 255))
-        screen.blit(trail_surface, (screen_pos[0] - player_radius // 2, screen_pos[1] - player_radius // 2))
+        alpha = int(150 * (1 - age / TRAIL_LIFETIME))
+        trail_surf = pygame.Surface((trail_radius * 2, trail_radius * 2))
+        trail_surf.set_colorkey((0, 0, 0))
+        trail_surf.set_alpha(alpha)
+        pygame.draw.circle(trail_surf, (255, 255, 255), (trail_radius, trail_radius), trail_radius)
+        screen.blit(trail_surf, (screen_pos[0] - trail_radius, screen_pos[1] - trail_radius))
 
     # Draw player arrow (tegeline)
     arrow_points = [
