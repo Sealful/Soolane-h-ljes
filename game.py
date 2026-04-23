@@ -91,10 +91,10 @@ while running:
 
     arrow_surface = pygame.Surface((player_radius * 2, player_radius * 2), pygame.SRCALPHA)
     arrow_surface_points = [
-        pygame.Vector2(p) + player_radius for p in arrow_points
+        (p[0] + player_radius, p[1] + player_radius) for p in arrow_points
     ]
     pygame.draw.polygon(arrow_surface, (255, 255, 255, 180), arrow_surface_points)
-    rotated_arrow = pygame.transform.rotate(arrow_surface, player_angle)
+    rotated_arrow = pygame.transform.rotate(arrow_surface, -player_angle)
     screen.blit(rotated_arrow, (player_pos.x - rotated_arrow.get_width() / 2, player_pos.y - rotated_arrow.get_height() / 2))
 
     for projectile in projectiles:
