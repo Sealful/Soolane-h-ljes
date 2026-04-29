@@ -1,6 +1,9 @@
 import pygame
 import math
 
+from enemy import Enemy
+from spawn_manager import SpawnManager
+
 # ============================================
 # pygame setup
 # ============================================
@@ -53,12 +56,23 @@ shoot_cooldown = 0.12
 shoot_timer = 0
 
 # ============================================
+# Enemy system
+# ============================================
+enemies = []
+spawn_manager = SpawnManager(map_vertices, (center, center))
+
+# ============================================
 # Player trail (visual effect)
 # ============================================
 TRAIL_LIFETIME = 0.5  # how long trail points last in seconds
 TRAIL_INTERVAL = 0.02  # how often to record a trail point
 trail_timer = 0
 trail = []  # list of (position, age) tuples
+
+# ============================================
+# Score
+# ============================================
+score = 0
 
 # ============================================
 # Utility functions
@@ -185,6 +199,33 @@ while running:
         if point_in_polygon((p["pos"].x, p["pos"].y), map_vertices)
     ]
 
+    # Spawn new enemy waves
+    new_enemies = spawn_manager.update(dt, enemies, player_pos)
+    enemies.extend(new_enemies)
+
+    # Update enemies - move toward player
+    for enemy_unit in enemies:
+        enemy_unit.update(dt, player_pos)
+
+    # Bullet-enemy collision detection
+    bullets_to_remove = set()
+    enemies_to_remove = set()
+
+    for p_idx, projectile in enumerate(projectiles):
+        for e_idx, enemy_unit in enumerate(enemies):
+            if enemy_unit.collides_with(projectile["pos"], projectile_radius):
+                bullets_to_remove.add(p_idx)
+                if enemy_unit.take_damage(1):
+                    enemies_to_remove.add(e_idx)
+                    score += enemy_unit.points
+                break  # Bullet can only hit one enemy
+
+    # Remove hit bullets and dead enemies
+    if bullets_to_remove:
+        projectiles = [p for i, p in enumerate(projectiles) if i not in bullets_to_remove]
+    if enemies_to_remove:
+        enemies = [e for i, e in enumerate(enemies) if i not in enemies_to_remove]
+
     # Update player trail (only record when moving)
     trail_timer += dt
     if trail_timer >= TRAIL_INTERVAL and move_dir.length() > 0:
@@ -207,6 +248,10 @@ while running:
 
     # Draw map border
     pygame.draw.polygon(screen, "white", [(v[0] - camera_offset.x, v[1] - camera_offset.y) for v in map_vertices], 3)
+
+    # Draw enemies
+    for enemy_unit in enemies:
+        enemy_unit.draw(screen, camera_offset)
 
     # Draw player trail (visual effect - small fading circles)
     trail_radius = int(player_radius * 0.35)
@@ -243,6 +288,11 @@ while running:
         start_screen = (projectile["pos"].x - camera_offset.x, projectile["pos"].y - camera_offset.y)
         end_screen = (end_pos.x - camera_offset.x, end_pos.y - camera_offset.y)
         pygame.draw.line(screen, "yellow", start_screen, end_screen, 3)
+
+    # Draw score
+    font = pygame.font.SysFont(None, 28)
+    score_text = font.render(f"Score: {score}", True, (255, 255, 255))
+    screen.blit(score_text, (10, 10))
 
     # flip() the display to put your work on screen
     pygame.display.flip()
