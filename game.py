@@ -1,6 +1,9 @@
 import pygame
 import math
 
+from enemy import Enemy
+from spawn_manager import SpawnManager
+
 # ============================================
 # pygame setup
 # ============================================
@@ -33,7 +36,7 @@ for i in range(8):
 camera_offset = pygame.Vector2(0, 0)
 
 # ============================================
-# Player settings (kiire juurdepääs)
+# Player settings
 # ============================================
 player_pos = pygame.Vector2(center, center)
 player_radius = 15
@@ -53,12 +56,23 @@ shoot_cooldown = 0.12
 shoot_timer = 0
 
 # ============================================
+# Enemy system
+# ============================================
+enemies = []
+spawn_manager = SpawnManager(map_vertices, (center, center))
+
+# ============================================
 # Player trail (visual effect)
 # ============================================
 TRAIL_LIFETIME = 0.5  # how long trail points last in seconds
 TRAIL_INTERVAL = 0.02  # how often to record a trail point
 trail_timer = 0
 trail = []  # list of (position, age) tuples
+
+# ============================================
+# Score
+# ============================================
+score = 0
 
 # ============================================
 # Utility functions
@@ -80,7 +94,6 @@ def point_in_polygon(point, vertices):
 
 def clamp_to_map(pos, vertices, radius):
     """Clamp player position to stay inside the map boundary."""
-    # (pole optimized, sest ma ei suutnud midagi paremat välja mõelda)
     if point_in_polygon((pos.x, pos.y), vertices):
         return pos
 
@@ -106,7 +119,8 @@ def clamp_to_map(pos, vertices, radius):
             min_dist = dist
             closest = pygame.Vector2(proj_x, proj_y)
 
-    # Lükkab mängiat sissepoole: dir_vec points from player to edge (võib tekitada tulevikus probleeme)
+    # Push player inside: dir_vec points from player to edge (inward)
+    # so we add it to closest to move further inside
     if min_dist > 0:
         dir_vec = pygame.Vector2(closest.x - pos.x, closest.y - pos.y).normalize()
         return closest + dir_vec * radius
@@ -137,7 +151,7 @@ while running:
         move_dir.x += 1
         player_pos.x += player_speed * dt
 
-    # Clamp function
+    # Keep player inside the map
     player_pos = clamp_to_map(player_pos, map_vertices, player_radius)
 
     # Smooth rotation toward movement direction
@@ -185,7 +199,34 @@ while running:
         if point_in_polygon((p["pos"].x, p["pos"].y), map_vertices)
     ]
 
-    # Player trail (See visuaalne trail mängija taga)
+    # Spawn new enemy waves
+    new_enemies = spawn_manager.update(dt, enemies, player_pos)
+    enemies.extend(new_enemies)
+
+    # Update enemies - move toward player
+    for enemy_unit in enemies:
+        enemy_unit.update(dt, player_pos)
+
+    # Bullet-enemy collision detection
+    bullets_to_remove = set()
+    enemies_to_remove = set()
+
+    for p_idx, projectile in enumerate(projectiles):
+        for e_idx, enemy_unit in enumerate(enemies):
+            if enemy_unit.collides_with(projectile["pos"], projectile_radius):
+                bullets_to_remove.add(p_idx)
+                if enemy_unit.take_damage(1):
+                    enemies_to_remove.add(e_idx)
+                    score += enemy_unit.points
+                break  # Bullet can only hit one enemy
+
+    # Remove hit bullets and dead enemies
+    if bullets_to_remove:
+        projectiles = [p for i, p in enumerate(projectiles) if i not in bullets_to_remove]
+    if enemies_to_remove:
+        enemies = [e for i, e in enumerate(enemies) if i not in enemies_to_remove]
+
+    # Update player trail (only record when moving)
     trail_timer += dt
     if trail_timer >= TRAIL_INTERVAL and move_dir.length() > 0:
         trail.append((pygame.Vector2(player_pos), 0))
@@ -199,16 +240,20 @@ while running:
     camera_offset.y = player_pos.y - screen.get_height() / 2
 
     # ============================================
-    # Rendering (draw funktsioonid enamus)
+    # Rendering
     # ============================================
 
-    # Screen fill
+    # fill the screen with black to wipe away anything from last frame
     screen.fill("black")
 
-    # Map border draw
+    # Draw map border
     pygame.draw.polygon(screen, "white", [(v[0] - camera_offset.x, v[1] - camera_offset.y) for v in map_vertices], 3)
 
-    # Player trail draw
+    # Draw enemies
+    for enemy_unit in enemies:
+        enemy_unit.draw(screen, camera_offset)
+
+    # Draw player trail (visual effect - small fading circles)
     trail_radius = int(player_radius * 0.35)
     for pos, age in trail:
         screen_pos = (pos.x - camera_offset.x, pos.y - camera_offset.y)
@@ -219,7 +264,7 @@ while running:
         pygame.draw.circle(trail_surf, (255, 255, 255), (trail_radius, trail_radius), trail_radius)
         screen.blit(trail_surf, (screen_pos[0] - trail_radius, screen_pos[1] - trail_radius))
 
-    # Player arrow draw
+    # Draw player arrow (tegeline)
     arrow_points = [
         (0, -player_radius),
         (-player_radius * 0.5, player_radius * 0.3),
@@ -237,17 +282,22 @@ while running:
     screen_y = player_pos.y - camera_offset.y - rotated_arrow.get_height() / 2
     screen.blit(rotated_arrow, (screen_x, screen_y))
 
-    # Projectiles draw
+    # Draw projectiles (kuulid)
     for projectile in projectiles:
         end_pos = projectile["pos"] + projectile["vel"].normalize() * 15
         start_screen = (projectile["pos"].x - camera_offset.x, projectile["pos"].y - camera_offset.y)
         end_screen = (end_pos.x - camera_offset.x, end_pos.y - camera_offset.y)
         pygame.draw.line(screen, "yellow", start_screen, end_screen, 3)
 
-    # ma ei mäleta miks seda vaja oli
+    # Draw score
+    font = pygame.font.SysFont(None, 28)
+    score_text = font.render(f"Score: {score}", True, (255, 255, 255))
+    screen.blit(score_text, (10, 10))
+
+    # flip() the display to put your work on screen
     pygame.display.flip()
 
-    # fps limiter
+    # limits FPS to 60
     dt = clock.tick(60) / 1000
 
 pygame.quit()
