@@ -28,7 +28,7 @@ def create_enemy(type_name, world_pos, **overrides):
 class Enemy:
     """Base enemy with position, movement toward player, health, and rendering."""
 
-    def __init__(self, world_pos, radius, speed, health, damage, color):
+    def __init__(self, world_pos, radius, speed, health, damage, color, score_value=10):
         """
         Initialize an enemy.
 
@@ -39,6 +39,7 @@ class Enemy:
             health (int): Starting health.
             damage (int): Damage dealt on player contact.
             color (tuple): RGB color tuple for rendering.
+            score_value (int): Score awarded when this enemy is defeated.
         """
         self.pos = pygame.Vector2(world_pos)
         self.radius = radius
@@ -47,6 +48,7 @@ class Enemy:
         self.max_health = health
         self.damage = damage
         self.color = color
+        self.score_value = score_value
 
     def update(self, dt, player_pos):
         """Move toward the player (direct pursuit)."""
@@ -85,19 +87,19 @@ class Enemy:
 # ============================================
 def _make_basic(pos, **overrides):
     """Standard enemy: balanced speed and health."""
-    stats = {"radius": 18, "speed": 160, "health": 2, "damage": 1, "color": (255, 80, 80)}
+    stats = {"radius": 18, "speed": 160, "health": 2, "damage": 1, "color": (255, 80, 80), "score_value": 10}
     stats.update(overrides)
     return Enemy(pos, **stats)
 
 def _make_fast(pos, **overrides):
     """Fast enemy: high speed, low health."""
-    stats = {"radius": 14, "speed": 280, "health": 1, "damage": 1, "color": (80, 255, 80)}
+    stats = {"radius": 14, "speed": 280, "health": 1, "damage": 1, "color": (80, 255, 80), "score_value": 15}
     stats.update(overrides)
     return Enemy(pos, **stats)
 
 def _make_tank(pos, **overrides):
     """Tank enemy: slow, high health, high damage."""
-    stats = {"radius": 28, "speed": 100, "health": 5, "damage": 2, "color": (80, 80, 255)}
+    stats = {"radius": 28, "speed": 100, "health": 5, "damage": 2, "color": (80, 80, 255), "score_value": 30}
     stats.update(overrides)
     return Enemy(pos, **stats)
 

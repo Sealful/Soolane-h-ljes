@@ -1,5 +1,6 @@
 import pygame
 import math
+import random
 
 from enemy import Enemy
 from spawn_manager import SpawnManager
@@ -45,6 +46,11 @@ player_radius = 15
 player_angle = 0
 target_angle = 0
 rotation_speed = 8
+player_max_health = 7
+player_health = player_max_health
+player_invulnerable_timer = 0.0
+player_invulnerable_duration = 1.0
+game_over = False
 
 # ============================================
 # Drift physics - Triivfüüsika
@@ -52,6 +58,8 @@ rotation_speed = 8
 player_velocity = pygame.Vector2(0, 0)
 player_acceleration = 1200      # Acceleration rate (pixels/s²)
 player_drag = 4.0               # Friction coefficient (higher = less drift)
+speed_power_multiplier = 1.7
+speed_power_timer = 0.0
 
 # ============================================
 # Projectiles - Kuulid
@@ -62,6 +70,39 @@ projectile_radius = 8
 
 shoot_cooldown = 0.25           # Slower shooting speed
 shoot_timer = 0
+multi_shot_timer = 0.0
+multi_shot_projectile_count = 3
+multi_shot_spread = 18
+rapid_fire_timer = 0.0
+rapid_fire_multiplier = 2.0
+
+# ============================================
+# Power upid
+# ============================================
+powerups = []
+powerup_radius = 13
+powerup_drop_chance = 0.14
+powerup_lifetime = 12.0
+powerup_duration = 8.0
+POWERUP_TYPES = {
+    "multi_shot": {
+        "color": (255, 210, 60),
+        "label": "M",
+    },
+    "speed": {
+        "color": (70, 220, 255),
+        "label": "S",
+    },
+    "rapid_fire": {
+        "color": (255, 110, 210),
+        "label": "R",
+    },
+}
+
+# ============================================
+# Punktid
+# ============================================
+score = 0
 
 # ============================================
 # Enemy system - Vaenlase süsteem
@@ -145,6 +186,49 @@ def clamp_to_map(pos, vertices, radius):
     return pos
 
 
+def spawn_powerup(world_pos):
+    """Maybe create a power up at the given world position."""
+    if random.random() > powerup_drop_chance:
+        return
+
+    powerup_type = random.choice(list(POWERUP_TYPES.keys()))
+    powerups.append({
+        "pos": pygame.Vector2(world_pos),
+        "type": powerup_type,
+        "age": 0.0,
+    })
+
+
+def create_projectile(spawn_pos, direction):
+    """Create a projectile dictionary using the standard projectile speed."""
+    return {
+        "pos": pygame.Vector2(spawn_pos),
+        "vel": direction * projectile_speed
+    }
+
+
+def apply_powerup(powerup_type):
+    """Activate the collected power up."""
+    global multi_shot_timer, speed_power_timer, rapid_fire_timer
+
+    if powerup_type == "multi_shot":
+        multi_shot_timer = powerup_duration
+    elif powerup_type == "speed":
+        speed_power_timer = powerup_duration
+    elif powerup_type == "rapid_fire":
+        rapid_fire_timer = powerup_duration
+
+
+def draw_health_square(surface, x, y, size, filled):
+    """Draw a small square health pip."""
+    color = (255, 70, 95) if filled else (80, 80, 80)
+    outline = (255, 120, 135) if filled else (120, 120, 120)
+    rect = pygame.Rect(x, y, size, size)
+
+    pygame.draw.rect(surface, color, rect)
+    pygame.draw.rect(surface, outline, rect, 2)
+
+
 # ============================================
 # Main game loop - Mängu tsükkel
 # ============================================
@@ -154,19 +238,24 @@ while running:
         if event.type == pygame.QUIT:
             running = False
 
+    multi_shot_timer = max(0.0, multi_shot_timer - dt)
+    speed_power_timer = max(0.0, speed_power_timer - dt)
+    rapid_fire_timer = max(0.0, rapid_fire_timer - dt)
+    player_invulnerable_timer = max(0.0, player_invulnerable_timer - dt)
+
     # ============================================
     # Player input - Mängija sisend
     # ============================================
     keys = pygame.key.get_pressed()
     input_dir = pygame.Vector2(0, 0)
 
-    if keys[pygame.K_w]:
+    if not game_over and keys[pygame.K_w]:
         input_dir.y -= 1
-    if keys[pygame.K_s]:
+    if not game_over and keys[pygame.K_s]:
         input_dir.y += 1
-    if keys[pygame.K_a]:
+    if not game_over and keys[pygame.K_a]:
         input_dir.x -= 1
-    if keys[pygame.K_d]:
+    if not game_over and keys[pygame.K_d]:
         input_dir.x += 1
 
     # ============================================
@@ -174,7 +263,10 @@ while running:
     # ============================================
     if input_dir.length() > 0:
         input_dir = input_dir.normalize()
-        player_velocity += input_dir * player_acceleration * dt
+        current_acceleration = player_acceleration
+        if speed_power_timer > 0:
+            current_acceleration *= speed_power_multiplier
+        player_velocity += input_dir * current_acceleration * dt
 
     # Apply drag (friction) - friction slows velocity
     player_velocity *= (1 - player_drag * dt)
@@ -206,7 +298,7 @@ while running:
     shoot_timer -= dt
     mouse_buttons = pygame.mouse.get_pressed()
 
-    if mouse_buttons[0] and shoot_timer <= 0:
+    if not game_over and mouse_buttons[0] and shoot_timer <= 0:
         world_mouse = pygame.Vector2(pygame.mouse.get_pos()) + camera_offset
         direction = world_mouse - player_pos
 
@@ -216,12 +308,18 @@ while running:
             # Shoot from the edge of the player - Kuuli laskmine äärest
             spawn_pos = player_pos + direction * (player_radius + projectile_radius)
 
-            projectile = {
-                "pos": pygame.Vector2(spawn_pos),
-                "vel": direction * projectile_speed
-            }
-            projectiles.append(projectile)
-            shoot_timer = shoot_cooldown
+            if multi_shot_timer > 0:
+                middle_index = (multi_shot_projectile_count - 1) / 2
+                for shot_index in range(multi_shot_projectile_count):
+                    spread_angle = (shot_index - middle_index) * multi_shot_spread
+                    shot_direction = direction.rotate(spread_angle)
+                    projectiles.append(create_projectile(spawn_pos, shot_direction))
+            else:
+                projectiles.append(create_projectile(spawn_pos, direction))
+            current_shoot_cooldown = shoot_cooldown
+            if rapid_fire_timer > 0:
+                current_shoot_cooldown /= rapid_fire_multiplier
+            shoot_timer = current_shoot_cooldown
 
     # ============================================
     # Update projectiles - Kuulide uuendus
@@ -250,7 +348,10 @@ while running:
     # Enemy system - Vaenlase süsteem
     # ============================================
     # Spawn new enemy waves
-    new_enemies = spawn_manager.update(dt, enemies, player_pos)
+    if game_over:
+        new_enemies = []
+    else:
+        new_enemies = spawn_manager.update(dt, enemies, player_pos)
 
     # Apply difficulty speed scaling to new enemies
     speed_mult = difficulty_manager.get_enemy_speed_multiplier()
@@ -263,8 +364,9 @@ while running:
     enemies.extend(new_enemies)
 
     # Update enemies - move toward player
-    for enemy_unit in enemies:
-        enemy_unit.update(dt, player_pos)
+    if not game_over:
+        for enemy_unit in enemies:
+            enemy_unit.update(dt, player_pos)
 
     # Enemy-player collision push - Vaenlase tõukumine
     # Push overlapping enemies away from player so they can't go inside
@@ -272,6 +374,15 @@ while running:
         dist = enemy_unit.pos.distance_to(player_pos)
         min_dist = enemy_unit.radius + player_radius
         if dist < min_dist and dist > 0:
+            if not game_over and player_invulnerable_timer <= 0:
+                player_health -= 1
+                player_invulnerable_timer = player_invulnerable_duration
+                if player_health <= 0:
+                    player_health = 0
+                    game_over = True
+                    player_velocity.x = 0
+                    player_velocity.y = 0
+
             push_dir = (enemy_unit.pos - player_pos).normalize()
             enemy_unit.pos = player_pos + push_dir * min_dist
 
@@ -281,12 +392,16 @@ while running:
     bullets_to_remove = set()
     enemies_to_remove = set()
 
-    for p_idx, projectile in enumerate(projectiles):
+    for p_idx, projectile in enumerate(projectiles if not game_over else []):
         for e_idx, enemy_unit in enumerate(enemies):
+            if e_idx in enemies_to_remove:
+                continue
             if enemy_unit.collides_with(projectile["pos"], projectile_radius):
                 bullets_to_remove.add(p_idx)
                 if enemy_unit.take_damage(1):
                     enemies_to_remove.add(e_idx)
+                    score += enemy_unit.score_value
+                    spawn_powerup(enemy_unit.pos)
                     # Spawn enemy hit effect at enemy position
                     vfx_manager.spawn_hit_effect(
                         pygame.Vector2(enemy_unit.pos), "enemy"
@@ -298,6 +413,24 @@ while running:
         projectiles = [p for i, p in enumerate(projectiles) if i not in bullets_to_remove]
     if enemies_to_remove:
         enemies = [e for i, e in enumerate(enemies) if i not in enemies_to_remove]
+
+    # ============================================
+    # Power up collection
+    # ============================================
+    collected_powerups = set()
+    for powerup_idx, powerup in enumerate(powerups if not game_over else []):
+        powerup["age"] += dt
+        if powerup["pos"].distance_to(player_pos) < player_radius + powerup_radius:
+            apply_powerup(powerup["type"])
+            collected_powerups.add(powerup_idx)
+        elif powerup["age"] >= powerup_lifetime:
+            collected_powerups.add(powerup_idx)
+
+    if collected_powerups:
+        powerups = [
+            p for i, p in enumerate(powerups)
+            if i not in collected_powerups
+        ]
 
     # ============================================
     # Player trail - Mängija jälg
@@ -319,8 +452,9 @@ while running:
     # ============================================
     # Update time - Aja uuendus
     # ============================================
-    game_time += dt
-    difficulty_manager.update(dt)
+    if not game_over:
+        game_time += dt
+        difficulty_manager.update(dt)
 
     # ============================================
     # Update VFX - Efektide uuendus
@@ -340,6 +474,24 @@ while running:
     # Draw enemies - Vaenlase renderdus
     for enemy_unit in enemies:
         enemy_unit.draw(screen, camera_offset)
+
+    # power upide ikoonid
+    powerup_font = pygame.font.SysFont(None, 22)
+    for powerup in powerups:
+        config = POWERUP_TYPES[powerup["type"]]
+        screen_pos = (
+            int(powerup["pos"].x - camera_offset.x),
+            int(powerup["pos"].y - camera_offset.y),
+        )
+        pulse = 1 + 0.12 * math.sin(pygame.time.get_ticks() * 0.008)
+        radius = int(powerup_radius * pulse)
+        pygame.draw.circle(screen, config["color"], screen_pos, radius, 2)
+        label = powerup_font.render(config["label"], True, config["color"])
+        label_pos = (
+            screen_pos[0] - label.get_width() / 2,
+            screen_pos[1] - label.get_height() / 2,
+        )
+        screen.blit(label, label_pos)
 
     # Draw player trail - Mängija jälg
     trail_radius = int(player_radius * 0.35)
@@ -364,7 +516,10 @@ while running:
     arrow_surface_points = [
         (p[0] + player_radius, p[1] + player_radius) for p in arrow_points
     ]
-    pygame.draw.polygon(arrow_surface, (255, 255, 255, 180), arrow_surface_points)
+    arrow_alpha = 180
+    if player_invulnerable_timer > 0 and int(pygame.time.get_ticks() / 120) % 2 == 0:
+        arrow_alpha = 80
+    pygame.draw.polygon(arrow_surface, (255, 255, 255, arrow_alpha), arrow_surface_points)
     rotated_arrow = pygame.transform.rotate(arrow_surface, -player_angle)
     screen_x = player_pos.x - camera_offset.x - rotated_arrow.get_width() / 2
     screen_y = player_pos.y - camera_offset.y - rotated_arrow.get_height() / 2
@@ -380,10 +535,52 @@ while running:
     # Draw VFX - Visuaalsed efektid
     vfx_manager.draw(screen, camera_offset)
 
+    # Draw health squares
+    health_size = 24
+    health_gap = 8
+    health_width = player_max_health * health_size + (player_max_health - 1) * health_gap
+    health_x = screen.get_width() / 2 - health_width / 2
+    for health_idx in range(player_max_health):
+        square_x = int(health_x + health_idx * (health_size + health_gap))
+        draw_health_square(screen, square_x, 10, health_size, health_idx < player_health)
+
     # Draw elapsed time - Aja kuvamine
     font = pygame.font.SysFont(None, 28)
     time_text = font.render(f"Time: {difficulty_manager.get_elapsed_time()}", True, (255, 255, 255))
     screen.blit(time_text, (10, 10))
+    score_text = font.render(f"Score: {score}", True, (255, 255, 255))
+    screen.blit(score_text, (10, 38))
+
+    active_powerups = []
+    if multi_shot_timer > 0:
+        active_powerups.append(f"Multi: {multi_shot_timer:.1f}s")
+    if speed_power_timer > 0:
+        active_powerups.append(f"Speed: {speed_power_timer:.1f}s")
+    if rapid_fire_timer > 0:
+        active_powerups.append(f"Fire Rate: {rapid_fire_timer:.1f}s")
+
+    for idx, powerup_text in enumerate(active_powerups):
+        rendered = font.render(powerup_text, True, (255, 255, 255))
+        screen.blit(rendered, (10, 66 + idx * 26))
+
+    if game_over:
+        game_over_font = pygame.font.SysFont(None, 72)
+        game_over_text = game_over_font.render("GAME OVER", True, (255, 80, 80))
+        score_final_text = font.render(f"Final Score: {score}", True, (255, 255, 255))
+        screen.blit(
+            game_over_text,
+            (
+                screen.get_width() / 2 - game_over_text.get_width() / 2,
+                screen.get_height() / 2 - game_over_text.get_height(),
+            ),
+        )
+        screen.blit(
+            score_final_text,
+            (
+                screen.get_width() / 2 - score_final_text.get_width() / 2,
+                screen.get_height() / 2 + 10,
+            ),
+        )
 
     # flip() the display to put your work on screen
     pygame.display.flip()
