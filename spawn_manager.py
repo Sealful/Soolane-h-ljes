@@ -4,7 +4,7 @@ import pygame
 import enemy
 
 # ============================================
-# Spawn configuration
+# Spawn configuration - Tekitamise seaded
 # ============================================
 SPAWN_INTERVAL = 2.0        # Seconds between spawn waves
 MAX_ENEMIES = 20            # Maximum concurrent enemies on map
@@ -13,25 +13,26 @@ WAVE_SIZE_MAX = 4           # Maximum enemies per wave
 SPAWN_JITTER = 80           # Random offset along map edge (pixels)
 SPREAD_RADIUS = 30          # How far wave members scatter from spawn point
 
-# Future hooks (unused now, available for later expansion):
-# spawn_rate_scaling = True   # Enable spawn rate increase with score
+# Future hooks (unused now, available for later expansion) - Tuleviku konksud:
 # directional_bias = False    # Spawn away from player movement direction
-# type_weighting = False      # Weight harder types by time survived
 
 class SpawnManager:
-    """Manages randomized enemy spawning along the map border."""
+    """Manages randomized enemy spawning along the map border - Tekitamine."""
 
-    def __init__(self, map_vertices, world_center):
+    def __init__(self, map_vertices, world_center, difficulty_manager=None):
         """
         Initialize the spawn manager.
 
         Args:
             map_vertices (list): List of (x, y) tuples defining the map polygon.
             world_center (pygame.Vector2): Center point of the map.
+            difficulty_manager (DifficultyManager, optional): Difficulty scaling.
+                Falls back to static config if not provided.
         """
         self.map_vertices = map_vertices
         self.world_center = pygame.Vector2(world_center)
         self.spawn_timer = 0.0
+        self.difficulty_manager = difficulty_manager
 
     def update(self, dt, current_enemies, player_pos):
         """
@@ -54,7 +55,12 @@ class SpawnManager:
         if len(current_enemies) >= MAX_ENEMIES:
             return new_enemies
 
-        self.spawn_timer = SPAWN_INTERVAL
+        # Use difficulty manager for spawn interval if available - Raskuse skaala
+        if self.difficulty_manager is not None:
+            self.spawn_timer = self.difficulty_manager.get_spawn_interval()
+        else:
+            self.spawn_timer = SPAWN_INTERVAL
+
         wave_size = random.randint(WAVE_SIZE_MIN, WAVE_SIZE_MAX)
 
         for _ in range(wave_size):
@@ -62,11 +68,32 @@ class SpawnManager:
                 break
 
             spawn_pos = self._get_random_spawn_point()
-            type_name = random.choice(enemy.get_available_types())
+            type_name = self._select_enemy_type()
             new_enemy = enemy.create_enemy(type_name, spawn_pos)
             new_enemies.append(new_enemy)
 
         return new_enemies
+
+    def _select_enemy_type(self):
+        """Select enemy type based on difficulty weighting - Tüüpide valik.
+
+        Uses difficulty manager weights if available, otherwise random.
+
+        Returns:
+            str: Enemy type name.
+        """
+        available_types = enemy.get_available_types()
+
+        if self.difficulty_manager is not None:
+            weights = self.difficulty_manager.get_type_weights()
+            # Map weights to available types in order
+            type_map = ["basic", "fast", "tank"]
+            weighted_types = []
+            for type_name, weight in zip(type_map, weights):
+                weighted_types.extend([type_name] * int(weight * 100))
+            return random.choice(weighted_types)
+        else:
+            return random.choice(available_types)
 
     def _get_random_spawn_point(self):
         """

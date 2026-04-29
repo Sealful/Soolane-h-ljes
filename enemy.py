@@ -28,7 +28,7 @@ def create_enemy(type_name, world_pos, **overrides):
 class Enemy:
     """Base enemy with position, movement toward player, health, and rendering."""
 
-    def __init__(self, world_pos, radius, speed, health, damage, color, points):
+    def __init__(self, world_pos, radius, speed, health, damage, color):
         """
         Initialize an enemy.
 
@@ -39,7 +39,6 @@ class Enemy:
             health (int): Starting health.
             damage (int): Damage dealt on player contact.
             color (tuple): RGB color tuple for rendering.
-            points (int): Score value when killed.
         """
         self.pos = pygame.Vector2(world_pos)
         self.radius = radius
@@ -48,7 +47,6 @@ class Enemy:
         self.max_health = health
         self.damage = damage
         self.color = color
-        self.points = points
 
     def update(self, dt, player_pos):
         """Move toward the player (direct pursuit)."""
@@ -87,19 +85,19 @@ class Enemy:
 # ============================================
 def _make_basic(pos, **overrides):
     """Standard enemy: balanced speed and health."""
-    stats = {"radius": 14, "speed": 120, "health": 2, "damage": 1, "color": (255, 80, 80), "points": 10}
+    stats = {"radius": 18, "speed": 120, "health": 2, "damage": 1, "color": (255, 80, 80)}
     stats.update(overrides)
     return Enemy(pos, **stats)
 
 def _make_fast(pos, **overrides):
     """Fast enemy: high speed, low health."""
-    stats = {"radius": 10, "speed": 220, "health": 1, "damage": 1, "color": (80, 255, 80), "points": 15}
+    stats = {"radius": 14, "speed": 220, "health": 1, "damage": 1, "color": (80, 255, 80)}
     stats.update(overrides)
     return Enemy(pos, **stats)
 
 def _make_tank(pos, **overrides):
     """Tank enemy: slow, high health, high damage."""
-    stats = {"radius": 22, "speed": 70, "health": 5, "damage": 2, "color": (80, 80, 255), "points": 25}
+    stats = {"radius": 28, "speed": 70, "health": 5, "damage": 2, "color": (80, 80, 255)}
     stats.update(overrides)
     return Enemy(pos, **stats)
 
