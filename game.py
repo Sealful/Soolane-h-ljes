@@ -50,8 +50,8 @@ rotation_speed = 8
 # Drift physics - Triivfüüsika
 # ============================================
 player_velocity = pygame.Vector2(0, 0)
-player_acceleration = 800       # Acceleration rate (pixels/s²)
-player_drag = 5.0               # Friction coefficient (higher = less drift)
+player_acceleration = 1200      # Acceleration rate (pixels/s²)
+player_drag = 4.0               # Friction coefficient (higher = less drift)
 
 # ============================================
 # Projectiles - Kuulid
@@ -265,6 +265,15 @@ while running:
     # Update enemies - move toward player
     for enemy_unit in enemies:
         enemy_unit.update(dt, player_pos)
+
+    # Enemy-player collision push - Vaenlase tõukumine
+    # Push overlapping enemies away from player so they can't go inside
+    for enemy_unit in enemies:
+        dist = enemy_unit.pos.distance_to(player_pos)
+        min_dist = enemy_unit.radius + player_radius
+        if dist < min_dist and dist > 0:
+            push_dir = (enemy_unit.pos - player_pos).normalize()
+            enemy_unit.pos = player_pos + push_dir * min_dist
 
     # ============================================
     # Collision detection - Kokkupõrge

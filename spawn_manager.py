@@ -131,9 +131,9 @@ class SpawnManager:
         edge_dir = self._get_edge_direction(best_point)
         jittered_point = best_point + edge_dir * jitter_amount
 
-        # Offset outside the map by a small amount
-        outward_dir = (jittered_point - self.world_center).normalize()
-        spawn_point = jittered_point + outward_dir * 40
+        # Offset inside the map by a small amount - Kaardi sees
+        inward_dir = (self.world_center - jittered_point).normalize()
+        spawn_point = jittered_point + inward_dir * 40
 
         return pygame.Vector2(spawn_point)
 

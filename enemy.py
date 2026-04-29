@@ -85,19 +85,19 @@ class Enemy:
 # ============================================
 def _make_basic(pos, **overrides):
     """Standard enemy: balanced speed and health."""
-    stats = {"radius": 18, "speed": 120, "health": 2, "damage": 1, "color": (255, 80, 80)}
+    stats = {"radius": 18, "speed": 160, "health": 2, "damage": 1, "color": (255, 80, 80)}
     stats.update(overrides)
     return Enemy(pos, **stats)
 
 def _make_fast(pos, **overrides):
     """Fast enemy: high speed, low health."""
-    stats = {"radius": 14, "speed": 220, "health": 1, "damage": 1, "color": (80, 255, 80)}
+    stats = {"radius": 14, "speed": 280, "health": 1, "damage": 1, "color": (80, 255, 80)}
     stats.update(overrides)
     return Enemy(pos, **stats)
 
 def _make_tank(pos, **overrides):
     """Tank enemy: slow, high health, high damage."""
-    stats = {"radius": 28, "speed": 70, "health": 5, "damage": 2, "color": (80, 80, 255)}
+    stats = {"radius": 28, "speed": 100, "health": 5, "damage": 2, "color": (80, 80, 255)}
     stats.update(overrides)
     return Enemy(pos, **stats)
 
