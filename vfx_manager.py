@@ -7,7 +7,7 @@ import math
 # ============================================
 
 # Registry for effect type configurations - allows adding new effects
-# without modifying core VFX logic. Future hooks - Tuleviku konksud.
+# without modifying core VFX logic. Future hooks - Tulevikuks.
 _effect_types = {}
 
 

@@ -34,7 +34,7 @@ for i in range(8):
     map_vertices.append((x, y))
 
 # ============================================
-# Camera - Kaamera jälgimine
+# Camera - Kaamera seaded
 # ============================================
 camera_offset = pygame.Vector2(0, 0)
 
@@ -53,7 +53,7 @@ player_invulnerable_duration = 1.0
 game_over = False
 
 # ============================================
-# Drift physics - Triivfüüsika
+# Drift physics - Triivfüüsika (floaty controls)
 # ============================================
 player_velocity = pygame.Vector2(0, 0)
 player_acceleration = 1200      # Acceleration rate (pixels/s²)
@@ -116,7 +116,7 @@ difficulty_manager = DifficultyManager()
 spawn_manager = SpawnManager(map_vertices, (center, center), difficulty_manager)
 
 # ============================================
-# Visual effects - Visuaalsed efektid
+# Visual effects - Efektid
 # ============================================
 vfx_manager = VFXManager()
 
